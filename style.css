@@ -2987,3 +2987,214 @@ html:not(.is-loaded) .logo-track{animation:none!important}
   }
 }
 
+/* =========================================================
+   CLIENT REVIEWS — HOME PAGE
+   Replace images/client-review-1.svg ... client-review-5.svg
+   with real client photos using the same filenames.
+========================================================= */
+.client-reviews-section {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(79, 70, 229, 0.08), transparent 28%),
+    radial-gradient(circle at 88% 88%, rgba(6, 182, 212, 0.08), transparent 30%),
+    #ffffff;
+}
+
+.client-reviews-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent);
+}
+
+.client-reviews-section .container {
+  position: relative;
+  z-index: 1;
+}
+
+.client-reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 38px;
+  align-items: stretch;
+}
+
+.client-review-card {
+  grid-column: span 2;
+  position: relative;
+  min-width: 0;
+  padding: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+  transition: transform 0.32s ease, box-shadow 0.32s ease, border-color 0.32s ease;
+}
+
+.client-review-card:nth-child(4) {
+  grid-column: 2 / span 2;
+}
+
+.client-review-card:nth-child(5) {
+  grid-column: 4 / span 2;
+}
+
+.client-review-card::before {
+  content: "“";
+  position: absolute;
+  top: 12px;
+  right: 20px;
+  color: rgba(79, 70, 229, 0.11);
+  font-family: Georgia, serif;
+  font-size: 76px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.client-review-card:hover {
+  transform: translateY(-7px);
+  border-color: rgba(79, 70, 229, 0.28);
+  box-shadow: 0 24px 58px rgba(37, 99, 235, 0.13);
+}
+
+.client-review-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.client-review-image {
+  width: 88px;
+  height: 88px;
+  flex: 0 0 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  padding: 3px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.2);
+}
+
+.client-review-person {
+  min-width: 0;
+}
+
+.client-review-person h3 {
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.client-review-person p {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.verified-client {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.client-review-stars {
+  margin-bottom: 13px;
+  color: #f59e0b;
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.client-review-card blockquote {
+  margin: 0;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.client-review-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 34px;
+  text-align: center;
+}
+
+.client-review-cta p {
+  margin: 0;
+  color: var(--text);
+  font-weight: 800;
+}
+
+@media (max-width: 991px) {
+  .client-reviews-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .client-review-card,
+  .client-review-card:nth-child(4),
+  .client-review-card:nth-child(5) {
+    grid-column: auto;
+  }
+
+  .client-review-card:last-child {
+    grid-column: 1 / -1;
+    width: min(100%, 560px);
+    justify-self: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .client-reviews-section {
+    padding: 70px 0;
+  }
+
+  .client-reviews-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin-top: 28px;
+  }
+
+  .client-review-card,
+  .client-review-card:last-child {
+    grid-column: auto;
+    width: 100%;
+    padding: 22px;
+  }
+
+  .client-review-image {
+    width: 76px;
+    height: 76px;
+    flex-basis: 76px;
+  }
+
+  .client-review-cta {
+    flex-direction: column;
+    gap: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-review-card {
+    transition: none;
+  }
+
+  .client-review-card:hover {
+    transform: none;
+  }
+}
+
