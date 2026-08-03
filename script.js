@@ -1,320 +1,436 @@
-const menuToggle = document.querySelector(".menu-toggle");
-const navLinks = document.querySelector(".nav-links");
+(() => {
+  "use strict";
 
-if (menuToggle && navLinks) {
-  menuToggle.addEventListener("click", () => {
-    navLinks.classList.toggle("show");
-  });
-}
+  const doc = document;
+  const root = doc.documentElement;
+  const win = window;
+  const prefersReducedMotion = win.matchMedia("(prefers-reduced-motion: reduce)");
 
-// Reveal on scroll
-const reveals = document.querySelectorAll(".reveal");
+  const BUTTON_SELECTOR = [
+    "button",
+    ".btn",
+    ".btn-primary",
+    ".btn-secondary",
+    ".nav-cta",
+    ".nav-btn",
+    ".cta-btn",
+    ".hero-btn",
+    "a.btn",
+    "a.btn-primary",
+    "a.btn-secondary",
+    "a.nav-cta",
+    "a.nav-btn",
+    "a.cta-btn",
+    "a.hero-btn",
+    'input[type="submit"]',
+    'input[type="button"]'
+  ].join(",");
 
-function revealOnScroll() {
-  reveals.forEach((el) => {
-    const top = el.getBoundingClientRect().top;
-    const visible = window.innerHeight - 80;
-    if (top < visible) {
-      el.classList.add("active");
+  const CURSOR_HOVER_SELECTOR =
+    ".btn, .card, .portfolio-card, .sticky-btn, .nav-links a";
+
+  function initMenu() {
+    const menuToggle = doc.querySelector(".menu-toggle");
+    const navLinks = doc.querySelector(".nav-links");
+
+    if (!menuToggle || !navLinks) return;
+
+    menuToggle.setAttribute("aria-expanded", navLinks.classList.contains("show") ? "true" : "false");
+
+    menuToggle.addEventListener("click", () => {
+      const isOpen = navLinks.classList.toggle("show");
+      menuToggle.setAttribute("aria-expanded", String(isOpen));
+    });
+
+    navLinks.addEventListener("click", (event) => {
+      if (!event.target.closest("a")) return;
+      navLinks.classList.remove("show");
+      menuToggle.setAttribute("aria-expanded", "false");
+    });
+
+    doc.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !navLinks.classList.contains("show")) return;
+      navLinks.classList.remove("show");
+      menuToggle.setAttribute("aria-expanded", "false");
+      menuToggle.focus();
+    });
+  }
+
+  function initRevealAnimations() {
+    const revealElements = [...doc.querySelectorAll(".reveal:not(.active)")];
+    if (!revealElements.length) return;
+
+    if (!("IntersectionObserver" in win) || prefersReducedMotion.matches) {
+      revealElements.forEach((element) => element.classList.add("active"));
+      return;
     }
-  });
-}
 
-window.addEventListener("scroll", revealOnScroll);
-window.addEventListener("load", revealOnScroll);
-
-// Counter animation
-const counters = document.querySelectorAll(".counter");
-
-function animateCounters() {
-  counters.forEach(counter => {
-    const rect = counter.getBoundingClientRect();
-    if (rect.top < window.innerHeight && !counter.classList.contains("counted")) {
-      counter.classList.add("counted");
-      const target = +counter.getAttribute("data-target");
-      let current = 0;
-      const increment = Math.ceil(target / 80);
-
-      const updateCounter = () => {
-        current += increment;
-        if (current >= target) {
-          counter.innerText = target.toLocaleString() + "+";
-        } else {
-          counter.innerText = current.toLocaleString() + "+";
-          requestAnimationFrame(updateCounter);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add("active");
+          observer.unobserve(entry.target);
         }
-      };
+      },
+      {
+        root: null,
+        rootMargin: "0px 0px -80px 0px",
+        threshold: 0.01
+      }
+    );
 
-      updateCounter();
+    revealElements.forEach((element) => observer.observe(element));
+  }
+
+  function animateCounter(counter) {
+    if (counter.dataset.counted === "true") return;
+
+    const target = Number(counter.dataset.target);
+    if (!Number.isFinite(target)) return;
+
+    counter.dataset.counted = "true";
+    counter.classList.add("counted");
+
+    if (prefersReducedMotion.matches || target <= 0) {
+      counter.textContent = `${Math.max(0, target).toLocaleString()}+`;
+      return;
     }
-  });
-}
 
-window.addEventListener("scroll", animateCounters);
-window.addEventListener("load", animateCounters);
+    const duration = 900;
+    const startTime = performance.now();
 
-/* =========================================================
-   AlgorithmOptix ULTRA PREMIUM BUTTON RIPPLE SYSTEM
-   Applies ripple to most buttons across all pages
-========================================================= */
-document.addEventListener("DOMContentLoaded", function () {
-  const AlgorithmOptixButtons = document.querySelectorAll(`
-    button,
-    .btn,
-    .btn-primary,
-    .btn-secondary,
-    .nav-cta,
-    .nav-btn,
-    .cta-btn,
-    .hero-btn,
-    a.btn,
-    a.btn-primary,
-    a.btn-secondary,
-    a.nav-cta,
-    a.nav-btn,
-    a.cta-btn,
-    a.hero-btn,
-    input[type="submit"],
-    input[type="button"]
-  `);
+    function update(now) {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(target * eased);
+      counter.textContent = `${current.toLocaleString()}+`;
 
-  AlgorithmOptixButtons.forEach((btn) => {
-    // Hover ripple from center
-    btn.addEventListener("mouseenter", function () {
-      const rect = btn.getBoundingClientRect();
-      createAlgorithmOptixButtonRipple(btn, rect.width / 2, rect.height / 2);
-    });
+      if (progress < 1) {
+        win.requestAnimationFrame(update);
+      }
+    }
 
-    // Click ripple from click point
-    btn.addEventListener("click", function (e) {
-      const rect = btn.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      createAlgorithmOptixButtonRipple(btn, x, y);
-    });
-  });
+    win.requestAnimationFrame(update);
+  }
 
-  function createAlgorithmOptixButtonRipple(btn, x, y) {
-    const ripple = document.createElement("span");
+  function initCounters() {
+    const counters = [...doc.querySelectorAll(".counter")];
+    if (!counters.length) return;
+
+    if (!("IntersectionObserver" in win)) {
+      counters.forEach(animateCounter);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          animateCounter(entry.target);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.2 }
+    );
+
+    counters.forEach((counter) => observer.observe(counter));
+  }
+
+  function createRipple(button, x, y) {
+    if (prefersReducedMotion.matches) return;
+
+    const ripple = doc.createElement("span");
     ripple.className = "AlgorithmOptix-btn-ripple";
     ripple.style.left = `${x}px`;
     ripple.style.top = `${y}px`;
+    button.appendChild(ripple);
 
-    btn.appendChild(ripple);
-
-    setTimeout(() => {
+    let removed = false;
+    const removeRipple = () => {
+      if (removed) return;
+      removed = true;
       ripple.remove();
-    }, 900);
+    };
+
+    ripple.addEventListener("animationend", removeRipple, { once: true });
+    win.setTimeout(removeRipple, 1000);
   }
-});
 
-/* =========================
-   SCROLL PROGRESS LINE
-========================= */
-const scrollProgress = document.querySelector(".scroll-progress");
+  function initButtonRipples() {
+    doc.addEventListener(
+      "pointerover",
+      (event) => {
+        if (event.pointerType === "touch") return;
 
-function updateScrollProgress() {
-  if (!scrollProgress) return;
+        const button = event.target.closest(BUTTON_SELECTOR);
+        if (!button) return;
+        if (event.relatedTarget && button.contains(event.relatedTarget)) return;
 
-  const scrollTop = window.scrollY;
-  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-  const scrollPercent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+        const rect = button.getBoundingClientRect();
+        createRipple(button, rect.width / 2, rect.height / 2);
+      },
+      { passive: true }
+    );
 
-  scrollProgress.style.width = scrollPercent + "%";
-}
+    doc.addEventListener(
+      "click",
+      (event) => {
+        const button = event.target.closest(BUTTON_SELECTOR);
+        if (!button) return;
 
-window.addEventListener("scroll", updateScrollProgress);
-window.addEventListener("load", updateScrollProgress);
-window.addEventListener("resize", updateScrollProgress);
-
-/* =========================
-   AlgorithmOptix WAVE LOADER HIDE
-========================= */
-window.addEventListener("load", function () {
-  const pageLoader = document.getElementById("page-loader");
-
-  if (pageLoader) {
-    setTimeout(() => {
-      pageLoader.classList.add("loader-hide");
-
-      setTimeout(() => {
-        pageLoader.style.display = "none";
-      }, 700);
-    }, 1000);
+        const rect = button.getBoundingClientRect();
+        const hasPointerPosition = Number.isFinite(event.clientX) && Number.isFinite(event.clientY);
+        const x = hasPointerPosition && event.clientX ? event.clientX - rect.left : rect.width / 2;
+        const y = hasPointerPosition && event.clientY ? event.clientY - rect.top : rect.height / 2;
+        createRipple(button, x, y);
+      },
+      { passive: true }
+    );
   }
-});
 
-/* =========================
-   AlgorithmOptix CUSTOM CURSOR RING
-========================= */
-const customCursor = document.querySelector(".custom-cursor");
+  function initScrollUI() {
+    const scrollProgress = doc.querySelector(".scroll-progress");
+    const navbar = doc.querySelector(".navbar");
 
-if (customCursor && window.innerWidth > 991) {
-  let mouseX = 0;
-  let mouseY = 0;
-  let currentX = 0;
-  let currentY = 0;
+    if (!scrollProgress && !navbar) return;
 
-  // Elements that trigger purple hover cursor
-  const hoverTargets = document.querySelectorAll(
-    ".btn, .card, .portfolio-card, .sticky-btn, .nav-links a"
-  );
-
-  // Track mouse
-  window.addEventListener("mousemove", (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
-    customCursor.style.opacity = "1";
-  });
-
-  // Smooth follow animation
-  function animateCursor() {
-    currentX += (mouseX - currentX) * 0.18;
-    currentY += (mouseY - currentY) * 0.18;
-
-    customCursor.style.left = currentX + "px";
-    customCursor.style.top = currentY + "px";
-
-    requestAnimationFrame(animateCursor);
-  }
-  animateCursor();
-
-  // Hide when mouse leaves window
-  document.addEventListener("mouseleave", () => {
-    customCursor.style.opacity = "0";
-  });
-
-  document.addEventListener("mouseenter", () => {
-    customCursor.style.opacity = "1";
-  });
-
-  // Hover effect on buttons/cards/links
-  hoverTargets.forEach((item) => {
-    item.addEventListener("mouseenter", () => {
-      customCursor.classList.add("cursor-hover");
-    });
-
-    item.addEventListener("mouseleave", () => {
-      customCursor.classList.remove("cursor-hover");
-    });
-  });
-
-  // Click effect
-  window.addEventListener("mousedown", () => {
-    customCursor.classList.add("cursor-click");
-  });
-
-  window.addEventListener("mouseup", () => {
-    customCursor.classList.remove("cursor-click");
-  });
-}
-
-/* =========================
-   CONTACT FORM - OTHER SERVICE TOGGLE
-========================= */
-const serviceSelect = document.getElementById("service");
-const otherServiceWrap = document.getElementById("other-service-wrap");
-const otherServiceField = document.getElementById("other-service");
-
-if (serviceSelect && otherServiceWrap && otherServiceField) {
-  function toggleOtherServiceField() {
-    if (serviceSelect.value === "Other") {
-      otherServiceWrap.style.display = "block";
-      otherServiceField.setAttribute("required", "required");
-    } else {
-      otherServiceWrap.style.display = "none";
-      otherServiceField.removeAttribute("required");
-      otherServiceField.value = "";
+    if (scrollProgress) {
+      scrollProgress.style.width = "100%";
+      scrollProgress.style.transformOrigin = "left center";
+      scrollProgress.style.willChange = "transform";
     }
-  }
 
-  serviceSelect.addEventListener("change", toggleOtherServiceField);
+    let framePending = false;
 
-  // page load pe bhi check
-  toggleOtherServiceField();
-}
+    const update = () => {
+      framePending = false;
+      const scrollTop = win.scrollY || root.scrollTop || 0;
 
-/* =========================
-   CONTACT FORM SUBMIT
-========================= */
-
-const contactForm = document.getElementById("contactForm");
-const submitBtn = document.getElementById("submitBtn");
-const successMsg = document.getElementById("form-success");
-
-if(contactForm && submitBtn){
-
-contactForm.addEventListener("submit", function(e){
-
-submitBtn.classList.add("loading");
-submitBtn.innerText="Sending...";
-
-setTimeout(()=>{
-
-contactForm.reset();
-
-submitBtn.classList.remove("loading");
-submitBtn.innerHTML='<span class="btn-text">Send Inquiry</span>';
-
-if(successMsg){
-successMsg.style.display="block";
-}
-
-},1500);
-
-});
-
-}
-
-const navbar = document.querySelector(".navbar");
-
-window.addEventListener("scroll", function(){
-  if(window.scrollY > 50){
-    navbar.classList.add("scrolled");
-  } else {
-    navbar.classList.remove("scrolled");
-  }
-});
-
-function showToast(){
-
-const contactForm = document.querySelector("form");
-const submitBtn = document.querySelector('.contact-form button[type="submit"], form button[type="submit"]');
-const successMsg = document.getElementById("thank-you-msg");
-const toast = document.getElementById("toast");
-
-function showToast() {
-  if (!toast) return;
-
-  toast.classList.add("show");
-
-  setTimeout(() => {
-    toast.classList.remove("show");
-  }, 4000);
-}
-
-if (contactForm && submitBtn) {
-  contactForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-
-    submitBtn.classList.add("loading");
-    submitBtn.innerText = "Sending...";
-
-    setTimeout(() => {
-      submitBtn.classList.remove("loading");
-      submitBtn.innerHTML = '<span class="btn-text">Send Inquiry</span>';
-
-      if (successMsg) {
-        successMsg.style.display = "block";
+      if (navbar) {
+        navbar.classList.toggle("scrolled", scrollTop > 50);
       }
 
-      showToast();
-      contactForm.reset();
-    }, 1500);
-  });
-}
-}
+      if (scrollProgress) {
+        const maxScroll = Math.max(root.scrollHeight - win.innerHeight, 0);
+        const ratio = maxScroll ? Math.min(scrollTop / maxScroll, 1) : 0;
+        scrollProgress.style.transform = `scaleX(${ratio})`;
+      }
+    };
 
+    const scheduleUpdate = () => {
+      if (framePending) return;
+      framePending = true;
+      win.requestAnimationFrame(update);
+    };
 
+    win.addEventListener("scroll", scheduleUpdate, { passive: true });
+    win.addEventListener("resize", scheduleUpdate, { passive: true });
+    win.addEventListener("load", scheduleUpdate, { once: true });
+    scheduleUpdate();
+  }
 
+  function hidePageLoader() {
+    const pageLoader = doc.getElementById("page-loader");
+    if (!pageLoader) return;
 
+    pageLoader.classList.add("loader-hide");
+    pageLoader.setAttribute("aria-hidden", "true");
+    pageLoader.style.display = "none";
+  }
+
+  function startDeferredVisuals() {
+    win.requestAnimationFrame(() => {
+      win.requestAnimationFrame(() => root.classList.add("is-loaded"));
+    });
+  }
+
+  function initCustomCursor() {
+    const customCursor = doc.querySelector(".custom-cursor");
+    const supportsFinePointer = win.matchMedia("(pointer: fine)").matches;
+
+    if (!customCursor || !supportsFinePointer || win.innerWidth <= 991 || prefersReducedMotion.matches) {
+      return;
+    }
+
+    let targetX = 0;
+    let targetY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let animationFrame = 0;
+
+    const animate = () => {
+      const deltaX = targetX - currentX;
+      const deltaY = targetY - currentY;
+
+      currentX += deltaX * 0.22;
+      currentY += deltaY * 0.22;
+      customCursor.style.left = `${currentX}px`;
+      customCursor.style.top = `${currentY}px`;
+
+      if (Math.abs(deltaX) > 0.15 || Math.abs(deltaY) > 0.15) {
+        animationFrame = win.requestAnimationFrame(animate);
+      } else {
+        currentX = targetX;
+        currentY = targetY;
+        customCursor.style.left = `${currentX}px`;
+        customCursor.style.top = `${currentY}px`;
+        animationFrame = 0;
+      }
+    };
+
+    const scheduleCursor = () => {
+      if (!animationFrame) animationFrame = win.requestAnimationFrame(animate);
+    };
+
+    win.addEventListener(
+      "pointermove",
+      (event) => {
+        if (event.pointerType === "touch") return;
+        targetX = event.clientX;
+        targetY = event.clientY;
+        customCursor.style.opacity = "1";
+        scheduleCursor();
+      },
+      { passive: true }
+    );
+
+    doc.addEventListener("pointerleave", () => {
+      customCursor.style.opacity = "0";
+    });
+
+    doc.addEventListener("pointerenter", () => {
+      customCursor.style.opacity = "1";
+    });
+
+    doc.addEventListener(
+      "pointerover",
+      (event) => {
+        const target = event.target.closest(CURSOR_HOVER_SELECTOR);
+        if (!target) return;
+        if (event.relatedTarget && target.contains(event.relatedTarget)) return;
+        customCursor.classList.add("cursor-hover");
+      },
+      { passive: true }
+    );
+
+    doc.addEventListener(
+      "pointerout",
+      (event) => {
+        const target = event.target.closest(CURSOR_HOVER_SELECTOR);
+        if (!target) return;
+        if (event.relatedTarget && target.contains(event.relatedTarget)) return;
+        customCursor.classList.remove("cursor-hover");
+      },
+      { passive: true }
+    );
+
+    win.addEventListener("pointerdown", () => customCursor.classList.add("cursor-click"), {
+      passive: true
+    });
+    win.addEventListener("pointerup", () => customCursor.classList.remove("cursor-click"), {
+      passive: true
+    });
+
+    doc.addEventListener("visibilitychange", () => {
+      if (!doc.hidden || !animationFrame) return;
+      win.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    });
+  }
+
+  function initOtherServiceField() {
+    const serviceSelect = doc.getElementById("service");
+    const otherServiceWrap = doc.getElementById("other-service-wrap");
+    const otherServiceField = doc.getElementById("other-service");
+
+    if (!serviceSelect || !otherServiceWrap || !otherServiceField) return null;
+
+    const toggle = () => {
+      const isOther = serviceSelect.value === "Other";
+      otherServiceWrap.style.display = isOther ? "block" : "none";
+      otherServiceField.required = isOther;
+      if (!isOther) otherServiceField.value = "";
+    };
+
+    serviceSelect.addEventListener("change", toggle);
+    toggle();
+    return toggle;
+  }
+
+  function showToast() {
+    const toast = doc.getElementById("toast");
+    if (!toast) return;
+
+    toast.classList.add("show");
+    win.setTimeout(() => toast.classList.remove("show"), 4000);
+  }
+
+  function initContactForm(resetOtherServiceField) {
+    const contactForm = doc.getElementById("contactForm");
+    if (!contactForm) return;
+
+    const submitButton =
+      doc.getElementById("submitBtn") ||
+      contactForm.querySelector('button[type="submit"], input[type="submit"]');
+
+    contactForm.addEventListener("submit", (event) => {
+      if (!contactForm.checkValidity()) return;
+
+      const action = (contactForm.getAttribute("action") || "").trim();
+      const handledLocally = !action || action === "#" || action.toLowerCase().startsWith("javascript:");
+
+      if (handledLocally) event.preventDefault();
+
+      if (submitButton) {
+        submitButton.classList.add("loading");
+        if ("value" in submitButton && submitButton.tagName === "INPUT") {
+          submitButton.value = "Sending...";
+        } else {
+          submitButton.textContent = "Sending...";
+        }
+      }
+
+      if (!handledLocally) return;
+
+      win.setTimeout(() => {
+        contactForm.reset();
+        if (typeof resetOtherServiceField === "function") resetOtherServiceField();
+
+        if (submitButton) {
+          submitButton.classList.remove("loading");
+          if ("value" in submitButton && submitButton.tagName === "INPUT") {
+            submitButton.value = "Send Inquiry";
+          } else {
+            submitButton.innerHTML = '<span class="btn-text">Send Inquiry</span>';
+          }
+        }
+
+        const successMessage =
+          doc.getElementById("form-success") || doc.getElementById("thank-you-msg");
+        if (successMessage) successMessage.style.display = "block";
+
+        showToast();
+      }, 600);
+    });
+  }
+
+  function init() {
+    hidePageLoader();
+    initMenu();
+    initRevealAnimations();
+    initCounters();
+    initButtonRipples();
+    initScrollUI();
+    initCustomCursor();
+    const resetOtherServiceField = initOtherServiceField();
+    initContactForm(resetOtherServiceField);
+    startDeferredVisuals();
+  }
+
+  if (doc.readyState === "loading") {
+    doc.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
+})();
