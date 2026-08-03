@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://www.algorithmoptix-it.xyz/wp-sitemap.xml
