@@ -434,3 +434,418 @@
     init();
   }
 })();
+
+
+/* Trust, privacy, cookie-consent, and form-completion enhancements */
+(() => {
+  "use strict";
+  const doc = document;
+  const CONSENT_KEY = "algorithmoptix_cookie_consent_v1";
+  const PIXEL_ID = "4290547257873979";
+  let pixelLoaded = false;
+
+  function readConsent() {
+    try { return JSON.parse(localStorage.getItem(CONSENT_KEY) || "null"); } catch (_) { return null; }
+  }
+  function writeConsent(marketing) {
+    const value = { essential: true, marketing: Boolean(marketing), updatedAt: new Date().toISOString() };
+    localStorage.setItem(CONSENT_KEY, JSON.stringify(value));
+    applyConsent(value);
+    return value;
+  }
+  function loadMetaPixel() {
+    if (pixelLoaded || window.fbq) return;
+    pixelLoaded = true;
+    !(function(f,b,e,v,n,t,s) {
+      if(f.fbq) return; n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq) f._fbq=n; n.push=n; n.loaded=true; n.version='2.0'; n.queue=[];
+      t=b.createElement(e); t.async=true; t.src=v; s=b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t,s);
+    })(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    window.fbq('init', PIXEL_ID);
+    window.fbq('track', 'PageView');
+  }
+  function applyConsent(consent) {
+    if (consent && consent.marketing) loadMetaPixel();
+    const banner = doc.getElementById('cookie-consent');
+    const modal = doc.getElementById('cookie-settings');
+    if (banner) banner.hidden = Boolean(consent);
+    if (modal) modal.hidden = true;
+    const marketing = doc.getElementById('cookie-marketing');
+    if (marketing) marketing.checked = Boolean(consent && consent.marketing);
+  }
+  function openSettings() {
+    const modal = doc.getElementById('cookie-settings');
+    const banner = doc.getElementById('cookie-consent');
+    const marketing = doc.getElementById('cookie-marketing');
+    const consent = readConsent();
+    if (marketing) marketing.checked = Boolean(consent && consent.marketing);
+    if (modal) modal.hidden = false;
+    if (banner) banner.hidden = true;
+  }
+  function closeSettings() {
+    const modal = doc.getElementById('cookie-settings');
+    if (modal) modal.hidden = true;
+    if (!readConsent()) { const banner=doc.getElementById('cookie-consent'); if (banner) banner.hidden=false; }
+  }
+  function initConsent() {
+    applyConsent(readConsent());
+    doc.querySelectorAll('[data-cookie-accept]').forEach(el => el.addEventListener('click', () => writeConsent(true)));
+    doc.querySelectorAll('[data-cookie-reject]').forEach(el => el.addEventListener('click', () => writeConsent(false)));
+    doc.querySelectorAll('[data-cookie-customise],[data-cookie-settings]').forEach(el => el.addEventListener('click', (e) => { e.preventDefault(); openSettings(); }));
+    doc.querySelectorAll('[data-cookie-close]').forEach(el => el.addEventListener('click', closeSettings));
+    const save=doc.querySelector('[data-cookie-save]');
+    if (save) save.addEventListener('click', () => writeConsent(Boolean(doc.getElementById('cookie-marketing')?.checked)));
+    const modal=doc.getElementById('cookie-settings');
+    if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeSettings(); });
+    doc.addEventListener('keydown', e => { if(e.key==='Escape') closeSettings(); });
+  }
+  function initYear() { doc.querySelectorAll('[data-current-year]').forEach(el => el.textContent=String(new Date().getFullYear())); }
+  function initRemoteFormCompletion() {
+    const form=doc.getElementById('contactForm');
+    const frame=doc.querySelector('iframe[name="hidden_iframe"]');
+    if(!form || !frame) return;
+    let submitted=false;
+    form.addEventListener('submit', e => {
+      if (!form.checkValidity()) { e.preventDefault(); form.reportValidity(); return; }
+      const honeypot=form.querySelector('[name="company_website"]');
+      if(honeypot && honeypot.value.trim()) { e.preventDefault(); return; }
+      submitted=true;
+    });
+    frame.addEventListener('load', () => {
+      if(!submitted) return; submitted=false;
+      form.reset();
+      const other=doc.getElementById('other-service-wrap'); if(other) other.hidden=true;
+      const button=doc.getElementById('submitBtn');
+      if(button) { button.classList.remove('loading'); button.innerHTML='<span class="btn-text">Send Enquiry</span>'; }
+      const success=doc.getElementById('form-success'); if(success) { success.style.display='block'; success.setAttribute('role','status'); success.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+      const toast=doc.getElementById('toast'); if(toast) { toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),4000); }
+    });
+  }
+  function initOtherFieldAccessibility() {
+    const select=doc.getElementById('service'); const wrap=doc.getElementById('other-service-wrap'); const field=doc.getElementById('other-service');
+    if(!select || !wrap || !field) return;
+    const update=()=>{ const show=select.value==='Other'; wrap.hidden=!show; field.required=show; if(!show) field.value=''; };
+    select.addEventListener('change',update); update();
+  }
+  function initTrustEnhancements() { initConsent(); initYear(); initRemoteFormCompletion(); initOtherFieldAccessibility(); }
+  if(doc.readyState==='loading') doc.addEventListener('DOMContentLoaded',initTrustEnhancements,{once:true}); else initTrustEnhancements();
+})();
+
+/* Accessible, non-intrusive founder-led SEO audit popup */
+(() => {
+  "use strict";
+
+  const POPUP_ID = "seo-audit-popup";
+  const FORM_ID = "seoAuditPopupForm";
+  const DISMISSED_KEY = "algorithmoptix_audit_popup_dismissed_v1";
+  const COMPLETED_KEY = "algorithmoptix_audit_popup_completed_v1";
+  const ENGAGED_KEY = "algorithmoptix_audit_popup_engaged_v1";
+  const COOKIE_KEY = "algorithmoptix_cookie_consent_v1";
+  const DISMISS_DAYS = 7;
+  const ENGAGED_DAYS = 30;
+  const DELAY_MS = 35000;
+  const EXIT_MIN_MS = 12000;
+  const SCROLL_TRIGGER = 0.55;
+  const WHATSAPP_NUMBER = "8801302149621";
+
+  const doc = document;
+  const win = window;
+  let popup;
+  let dialog;
+  let form;
+  let lastFocused = null;
+  let pageLoadedAt = Date.now();
+  let sessionShown = false;
+  let triggerTimer = 0;
+  let deferredTimer = 0;
+
+  function safeRead(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function safeWrite(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (_) {
+      // The popup still works when storage is unavailable.
+    }
+  }
+
+  function hasRecentTimestamp(key, days) {
+    const value = Number(safeRead(key));
+    if (!Number.isFinite(value) || value <= 0) return false;
+    return Date.now() - value < days * 24 * 60 * 60 * 1000;
+  }
+
+  function cookieChoiceResolved() {
+    return Boolean(safeRead(COOKIE_KEY));
+  }
+
+  function isCookieSettingsOpen() {
+    const settings = doc.getElementById("cookie-settings");
+    return Boolean(settings && !settings.hidden);
+  }
+
+  function isCookieBannerOpen() {
+    const banner = doc.getElementById("cookie-consent");
+    return Boolean(banner && !banner.hidden);
+  }
+
+  function isEligible() {
+    if (!popup || sessionShown || !popup.hidden) return false;
+    if (safeRead(COMPLETED_KEY) === "true") return false;
+    if (hasRecentTimestamp(DISMISSED_KEY, DISMISS_DAYS)) return false;
+    if (hasRecentTimestamp(ENGAGED_KEY, ENGAGED_DAYS)) return false;
+    if (isCookieSettingsOpen() || isCookieBannerOpen() || !cookieChoiceResolved()) return false;
+    return true;
+  }
+
+  function focusableElements() {
+    if (!dialog) return [];
+    return [...dialog.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )].filter((element) => element.offsetParent !== null);
+  }
+
+  function clearDeferredTimers() {
+    if (triggerTimer) win.clearTimeout(triggerTimer);
+    if (deferredTimer) win.clearTimeout(deferredTimer);
+    triggerTimer = 0;
+    deferredTimer = 0;
+  }
+
+  function showPopup(source = "timed") {
+    if (!isEligible()) return false;
+
+    sessionShown = true;
+    clearDeferredTimers();
+    lastFocused = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
+    popup.hidden = false;
+    popup.setAttribute("aria-hidden", "false");
+    popup.dataset.trigger = source;
+    doc.body.classList.add("seo-audit-popup-open");
+
+    win.requestAnimationFrame(() => {
+      const firstField = doc.getElementById("audit-website");
+      if (firstField) firstField.focus({ preventScroll: true });
+      else if (dialog) dialog.focus({ preventScroll: true });
+    });
+
+    return true;
+  }
+
+  function closePopup(reason = "dismissed") {
+    if (!popup || popup.hidden) return;
+
+    popup.hidden = true;
+    popup.setAttribute("aria-hidden", "true");
+    popup.removeAttribute("data-trigger");
+    doc.body.classList.remove("seo-audit-popup-open");
+
+    if (reason === "dismissed") safeWrite(DISMISSED_KEY, String(Date.now()));
+    if (reason === "engaged") safeWrite(ENGAGED_KEY, String(Date.now()));
+
+    if (lastFocused && typeof lastFocused.focus === "function") {
+      lastFocused.focus({ preventScroll: true });
+    }
+  }
+
+  function tryOpen(source) {
+    if (showPopup(source)) return;
+    if (sessionShown || safeRead(COMPLETED_KEY) === "true") return;
+
+    if (!deferredTimer) {
+      deferredTimer = win.setTimeout(() => {
+        deferredTimer = 0;
+        tryOpen(source);
+      }, 5000);
+    }
+  }
+
+  function updateError(input, message) {
+    const target = doc.querySelector(`[data-error-for="${input.id}"]`);
+    input.setAttribute("aria-invalid", message ? "true" : "false");
+    if (target) target.textContent = message;
+  }
+
+  function normalizeWebsite(value) {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  }
+
+  function validateForm() {
+    const website = doc.getElementById("audit-website");
+    const email = doc.getElementById("audit-email");
+    const whatsapp = doc.getElementById("audit-whatsapp");
+    let valid = true;
+
+    const websiteValue = normalizeWebsite(website.value);
+    website.value = websiteValue;
+
+    try {
+      const url = new URL(websiteValue);
+      if (!/^https?:$/.test(url.protocol) || !url.hostname.includes(".")) throw new Error("Invalid URL");
+      updateError(website, "");
+    } catch (_) {
+      updateError(website, "Enter a complete website address, for example https://example.com.");
+      valid = false;
+    }
+
+    if (!email.validity.valid || !email.value.trim()) {
+      updateError(email, "Enter a valid email address.");
+      valid = false;
+    } else {
+      updateError(email, "");
+    }
+
+    const phoneValue = whatsapp.value.trim();
+    if (phoneValue && !/^[+()\d\s.-]{7,25}$/.test(phoneValue)) {
+      updateError(whatsapp, "Enter a valid WhatsApp number or leave this field empty.");
+      valid = false;
+    } else {
+      updateError(whatsapp, "");
+    }
+
+    return valid;
+  }
+
+  function buildWhatsAppMessage() {
+    const website = doc.getElementById("audit-website").value.trim();
+    const email = doc.getElementById("audit-email").value.trim();
+    const whatsapp = doc.getElementById("audit-whatsapp").value.trim();
+    const lines = [
+      "Hello MD Sojib Hossen, I would like to request a free SEO audit.",
+      "",
+      `Website: ${website}`,
+      `Email: ${email}`,
+      `WhatsApp: ${whatsapp || "Not provided"}`,
+      "",
+      "Please review my technical SEO, on-page issues, search visibility, and practical growth opportunities."
+    ];
+    return lines.join("\n");
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    if (!form) return;
+
+    const honeypot = form.querySelector('[name="company_website"]');
+    if (honeypot && honeypot.value.trim()) {
+      closePopup("dismissed");
+      return;
+    }
+
+    if (!validateForm()) {
+      const firstInvalid = form.querySelector('[aria-invalid="true"]');
+      if (firstInvalid) firstInvalid.focus();
+      return;
+    }
+
+    const status = doc.getElementById("seoAuditPopupStatus");
+    if (status) status.textContent = "Opening WhatsApp with your audit request...";
+
+    safeWrite(COMPLETED_KEY, "true");
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
+    const newWindow = win.open(url, "_blank");
+    if (newWindow) {
+      try { newWindow.opener = null; } catch (_) { /* Cross-origin window; no action needed. */ }
+    } else {
+      win.location.href = url;
+    }
+
+    form.reset();
+    win.setTimeout(() => closePopup("completed"), 250);
+  }
+
+  function handleKeyboard(event) {
+    if (!popup || popup.hidden) return;
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePopup("dismissed");
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+    const elements = focusableElements();
+    if (!elements.length) {
+      event.preventDefault();
+      dialog.focus();
+      return;
+    }
+
+    const first = elements[0];
+    const last = elements[elements.length - 1];
+    if (event.shiftKey && doc.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && doc.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function handleScroll() {
+    if (sessionShown || !cookieChoiceResolved()) return;
+    const maxScroll = Math.max(doc.documentElement.scrollHeight - win.innerHeight, 1);
+    if (win.scrollY / maxScroll >= SCROLL_TRIGGER) {
+      win.removeEventListener("scroll", handleScroll);
+      tryOpen("scroll");
+    }
+  }
+
+  function handleExitIntent(event) {
+    if (win.innerWidth < 900 || event.clientY > 8) return;
+    if (Date.now() - pageLoadedAt < EXIT_MIN_MS) return;
+    doc.removeEventListener("mouseout", handleExitIntent);
+    tryOpen("exit-intent");
+  }
+
+  function initTriggers() {
+    triggerTimer = win.setTimeout(() => tryOpen("timed"), DELAY_MS);
+    win.addEventListener("scroll", handleScroll, { passive: true });
+    doc.addEventListener("mouseout", handleExitIntent);
+
+    doc.querySelectorAll("[data-cookie-accept], [data-cookie-reject], [data-cookie-save]").forEach((button) => {
+      button.addEventListener("click", () => {
+        win.setTimeout(() => tryOpen("after-cookie-choice"), 1500);
+      });
+    });
+  }
+
+  function initAuditPopup() {
+    popup = doc.getElementById(POPUP_ID);
+    form = doc.getElementById(FORM_ID);
+    dialog = popup ? popup.querySelector('[role="dialog"]') : null;
+    if (!popup || !form || !dialog) return;
+
+    popup.querySelectorAll("[data-audit-close]").forEach((element) => {
+      element.addEventListener("click", () => closePopup("dismissed"));
+    });
+
+    const whatsappLink = popup.querySelector("[data-audit-whatsapp]");
+    if (whatsappLink) {
+      whatsappLink.addEventListener("click", () => closePopup("engaged"));
+    }
+
+    form.addEventListener("submit", handleSubmit);
+    form.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("input", () => updateError(input, ""));
+    });
+    doc.addEventListener("keydown", handleKeyboard);
+    initTriggers();
+  }
+
+  if (doc.readyState === "loading") {
+    doc.addEventListener("DOMContentLoaded", initAuditPopup, { once: true });
+  } else {
+    initAuditPopup();
+  }
+})();
+
